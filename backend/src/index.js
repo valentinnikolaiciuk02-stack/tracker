@@ -189,7 +189,7 @@ app.use('/api/sessions', sessionRoutes(db));
 app.use('/api/objects', objectRoutes(db));
 app.use('/api/admin', adminRoutes(db));
 
-app.get('/api/health', (_, res) => res.json({ ok: true }));
+app.use(express.static(new URL('public', import.meta.url).pathname)); app.get('*', (_, res) => res.sendFile(new URL('public/index.html', import.meta.url).pathname)); app.get('/api/health', (_, res) => res.json({ ok: true }));
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {// Serve frontend
