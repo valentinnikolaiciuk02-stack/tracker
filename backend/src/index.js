@@ -35,7 +35,6 @@ process.on('exit', saveDb);
 process.on('SIGINT', () => { saveDb(); process.exit(); });
 process.on('SIGTERM', () => { saveDb(); process.exit(); });
 
-// ── Schema ────────────────────────────────────────────────────────────────────
 sqlDb.run(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,13 +45,11 @@ sqlDb.run(`
     hourly_rate REAL NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
-
   CREATE TABLE IF NOT EXISTS objects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
-
   CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -63,7 +60,6 @@ sqlDb.run(`
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (object_id) REFERENCES objects(id)
   );
-
   CREATE TABLE IF NOT EXISTS travel_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -76,7 +72,6 @@ sqlDb.run(`
   );
 `);
 
-// Add hourly_rate column if upgrading from old schema
 try { sqlDb.run(`ALTER TABLE users ADD COLUMN hourly_rate REAL NOT NULL DEFAULT 0`); } catch {}
 
 sqlDb.run(`INSERT OR IGNORE INTO objects (name) VALUES
@@ -85,7 +80,6 @@ sqlDb.run(`INSERT OR IGNORE INTO objects (name) VALUES
   ('Объект №3 — Производство'),
   ('Объект №4 — Филиал Север');`);
 
-// ── DB helpers ─────────────────────────────────────────────────────────────────
 function queryAll(sql, params = []) {
   try {
     const stmt = sqlDb.prepare(sql);
@@ -108,22 +102,18 @@ function run(sql, params = []) {
   } catch (e) { console.error('run:', e.message); throw e; }
 }
 
-// ── DB API ─────────────────────────────────────────────────────────────────────
 const db = {
-  // Users
   getUser: (email) => queryOne('SELECT * FROM users WHERE email = ?', [email]),
   getUserById: (id) => queryOne('SELECT id, name, email, role, hourly_rate, created_at FROM users WHERE id = ? AND role = "employee"', [id]),
   getUserByIdAll: (id) => queryOne('SELECT id, name, email, role, hourly_rate, created_at FROM users WHERE id = ?', [id]),
   createUser: (name, email, password, role, hourly_rate = 0) => run('INSERT INTO users (name, email, password, role, hourly_rate) VALUES (?, ?, ?, ?, ?)', [name, email, password, role, hourly_rate]),
   updateRate: (id, rate) => run('UPDATE users SET hourly_rate = ? WHERE id = ?', [rate, id]),
 
-  // Objects
   getAllObjects: () => queryAll('SELECT * FROM objects ORDER BY name'),
   getObject: (id) => queryOne('SELECT * FROM objects WHERE id = ?', [id]),
   getObjectByName: (name) => queryOne('SELECT * FROM objects WHERE name = ?', [name]),
   createObject: (name) => run('INSERT INTO objects (name) VALUES (?)', [name]),
 
-  // Sessions
   getSession: (id) => queryOne(`SELECT s.*, o.name as object_name FROM sessions s JOIN objects o ON s.object_id = o.id WHERE s.id = ?`, [id]),
   getActiveSession: (userId) => queryOne(`SELECT s.*, o.name as object_name FROM sessions s JOIN objects o ON s.object_id = o.id WHERE s.user_id = ? AND s.status = 'active' ORDER BY s.arrived_at DESC LIMIT 1`, [userId]),
   createSession: (userId, objectId) => run(`INSERT INTO sessions (user_id, object_id, arrived_at, status) VALUES (?, ?, datetime('now', 'localtime'), 'active')`, [userId, objectId]),
@@ -132,8 +122,9 @@ const db = {
 
   getUserSessions: (userId, from, to) => {
     let sql = `SELECT s.*, o.name as object_name,
-      ROUND((julianday(COALESCE(s.left_at, datetime('now','localtime'))) - julianday(s.arrived_at)) * 1440) as duration_minutes
-      FROM sessions s JOIN objects o ON s.object_id = o.id WHERE s.user_id = ?`;
+      ROUND((julianday(s.left_at) - julianday(s.arrived_at)) * 1440) as duration_minutes
+      FROM sessions s JOIN objects o ON s.object_id = o.id
+      WHERE s.user_id = ? AND s.status = 'closed'`;
     const params = [userId];
     if (from) { sql += ` AND date(s.arrived_at) >= ?`; params.push(from); }
     if (to) { sql += ` AND date(s.arrived_at) <= ?`; params.push(to); }
@@ -141,16 +132,16 @@ const db = {
     return queryAll(sql, params);
   },
 
-  // Travel
   getTravel: (id) => queryOne(`SELECT t.*, o.name as from_object_name FROM travel_records t LEFT JOIN objects o ON t.from_object_id = o.id WHERE t.id = ?`, [id]),
-  getActiveTravel: (userId) => queryOne(`SELECT * FROM travel_records WHERE user_id = ? AND status = 'active' ORDER BY started_at DESC LIMIT 1`, [userId]),
+  getActiveTravel: (userId) => queryOne(`SELECT t.*, o.name as from_object_name FROM travel_records t LEFT JOIN objects o ON t.from_object_id = o.id WHERE t.user_id = ? AND t.status = 'active' ORDER BY t.started_at DESC LIMIT 1`, [userId]),
   createTravel: (userId, fromObjectId) => run(`INSERT INTO travel_records (user_id, from_object_id, started_at, status) VALUES (?, ?, datetime('now', 'localtime'), 'active')`, [userId, fromObjectId]),
   closeTravel: (id) => run(`UPDATE travel_records SET status = 'closed', ended_at = datetime('now', 'localtime') WHERE id = ?`, [id]),
 
   getUserTravels: (userId, from, to) => {
     let sql = `SELECT t.*, o.name as from_object_name,
-      ROUND((julianday(COALESCE(t.ended_at, datetime('now','localtime'))) - julianday(t.started_at)) * 1440) as duration_minutes
-      FROM travel_records t LEFT JOIN objects o ON t.from_object_id = o.id WHERE t.user_id = ?`;
+      ROUND((julianday(t.ended_at) - julianday(t.started_at)) * 1440) as duration_minutes
+      FROM travel_records t LEFT JOIN objects o ON t.from_object_id = o.id
+      WHERE t.user_id = ? AND t.status = 'closed'`;
     const params = [userId];
     if (from) { sql += ` AND date(t.started_at) >= ?`; params.push(from); }
     if (to) { sql += ` AND date(t.started_at) <= ?`; params.push(to); }
@@ -158,18 +149,22 @@ const db = {
     return queryAll(sql, params);
   },
 
+  // IMPORTANT: only count CLOSED sessions/travels to avoid infinite accumulation
   getUserStats: (userId, from, to) => {
-    const params = [userId];
-    let dateFilter = '';
-    if (from) { dateFilter += ` AND date(arrived_at) >= '${from}'`; }
-    if (to) { dateFilter += ` AND date(arrived_at) <= '${to}'`; }
+    let workSql = `SELECT COALESCE(SUM(ROUND((julianday(left_at) - julianday(arrived_at)) * 1440)), 0) as work_minutes
+      FROM sessions WHERE user_id = ? AND status = 'closed'`;
+    const wParams = [userId];
+    if (from) { workSql += ` AND date(arrived_at) >= ?`; wParams.push(from); }
+    if (to) { workSql += ` AND date(arrived_at) <= ?`; wParams.push(to); }
 
-    const workRow = queryOne(`SELECT COALESCE(SUM(ROUND((julianday(COALESCE(left_at, datetime('now','localtime'))) - julianday(arrived_at)) * 1440)), 0) as work_minutes FROM sessions WHERE user_id = ? AND status != 'active'${dateFilter}`, params);
+    let travelSql = `SELECT COALESCE(SUM(ROUND((julianday(ended_at) - julianday(started_at)) * 1440)), 0) as travel_minutes
+      FROM travel_records WHERE user_id = ? AND status = 'closed'`;
+    const tParams = [userId];
+    if (from) { travelSql += ` AND date(started_at) >= ?`; tParams.push(from); }
+    if (to) { travelSql += ` AND date(started_at) <= ?`; tParams.push(to); }
 
-    let travelFilter = '';
-    if (from) { travelFilter += ` AND date(started_at) >= '${from}'`; }
-    if (to) { travelFilter += ` AND date(started_at) <= '${to}'`; }
-    const travelRow = queryOne(`SELECT COALESCE(SUM(ROUND((julianday(COALESCE(ended_at, datetime('now','localtime'))) - julianday(started_at)) * 1440)), 0) as travel_minutes FROM travel_records WHERE user_id = ?${travelFilter}`, params);
+    const workRow = queryOne(workSql, wParams);
+    const travelRow = queryOne(travelSql, tParams);
 
     return {
       work_minutes: workRow?.work_minutes || 0,
@@ -177,7 +172,6 @@ const db = {
     };
   },
 
-  // Admin
   getAllEmployees: () => queryAll(`
     SELECT u.id, u.name, u.email, u.hourly_rate, u.created_at,
       (SELECT o.name FROM sessions s JOIN objects o ON s.object_id = o.id WHERE s.user_id = u.id AND s.status = 'active' LIMIT 1) as current_object,
@@ -190,15 +184,12 @@ const db = {
     WHERE s.status = 'active' ORDER BY s.arrived_at DESC`),
 };
 
-// ── Seed admin ─────────────────────────────────────────────────────────────────
 if (!db.getUser(process.env.ADMIN_EMAIL)) {
   const hash = bcrypt.hashSync(process.env.ADMIN_PASSWORD, 10);
   db.createUser(process.env.ADMIN_NAME, process.env.ADMIN_EMAIL, hash, 'admin', 0);
   saveDb();
-  console.log(`✅ Администратор создан: ${process.env.ADMIN_EMAIL}`);
 }
 
-// ── Express ────────────────────────────────────────────────────────────────────
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -214,4 +205,4 @@ app.use(express.static(frontendDist));
 app.get('*', (_, res) => res.sendFile(join(frontendDist, 'index.html')));
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Сервер: http://localhost:${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 http://localhost:${PORT}`));

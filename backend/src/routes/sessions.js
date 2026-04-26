@@ -6,7 +6,8 @@ export function sessionRoutes(db) {
 
   router.get('/current', authMiddleware, (req, res) => {
     const session = db.getActiveSession(req.user.id);
-    res.json({ session: session || null });
+    const travel = db.getActiveTravel(req.user.id);
+    res.json({ session: session || null, travel: travel || null });
   });
 
   router.post('/arrive', authMiddleware, (req, res) => {
@@ -15,13 +16,8 @@ export function sessionRoutes(db) {
     const obj = db.getObject(object_id);
     if (!obj) return res.status(404).json({ error: 'Объект не найден' });
 
-    // Check if there's a travel record to close
     const travel = db.getActiveTravel(req.user.id);
-    if (travel) {
-      db.closeTravel(travel.id);
-    }
-
-    // Close any active work session
+    if (travel) db.closeTravel(travel.id);
     db.closeActiveSession(req.user.id);
 
     const id = db.createSession(req.user.id, object_id);
@@ -34,13 +30,21 @@ export function sessionRoutes(db) {
     if (!active) return res.status(400).json({ error: 'Нет активной сессии' });
 
     db.closeSession(active.id);
-
-    // Create travel record
     const travelId = db.createTravel(req.user.id, active.object_id);
     const session = db.getSession(active.id);
     const travel = db.getTravel(travelId);
 
     res.json({ session, travel });
+  });
+
+  router.post('/end-day', authMiddleware, (req, res) => {
+    const activeSession = db.getActiveSession(req.user.id);
+    const activeTravel = db.getActiveTravel(req.user.id);
+
+    if (activeSession) db.closeSession(activeSession.id);
+    if (activeTravel) db.closeTravel(activeTravel.id);
+
+    res.json({ ok: true, closed_session: !!activeSession, closed_travel: !!activeTravel });
   });
 
   router.get('/history', authMiddleware, (req, res) => {
