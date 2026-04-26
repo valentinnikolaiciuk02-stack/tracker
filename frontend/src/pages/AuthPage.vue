@@ -1,49 +1,50 @@
 <template>
-  <div class="auth-wrap">
-    <div class="auth-bg">
-      <div class="grid-lines"></div>
-      <div class="glow glow-1"></div>
-      <div class="glow glow-2"></div>
-    </div>
+  <div class="auth-root">
+    <div class="auth-noise"></div>
+    <div class="auth-grid"></div>
 
-    <div class="auth-card">
+    <div class="auth-wrap">
       <div class="brand">
-        <span class="brand-icon">◈</span>
-        <span class="brand-name">TRACKER</span>
+        <span class="brand-mark">▣</span>
+        <span class="brand-text">TRACKER</span>
+        <span class="brand-ver">v2.0</span>
       </div>
 
-      <div class="tabs">
-        <button :class="['tab', { active: mode === 'login' }]" @click="mode = 'login'; error = ''">Вход</button>
-        <button :class="['tab', { active: mode === 'register' }]" @click="mode = 'register'; error = ''">Регистрация</button>
-      </div>
+      <div class="auth-card">
+        <div class="tabs">
+          <button :class="['tab', { active: mode === 'login' }]" @click="switchMode('login')">ВХОД</button>
+          <button :class="['tab', { active: mode === 'register' }]" @click="switchMode('register')">РЕГИСТРАЦИЯ</button>
+        </div>
 
-      <form @submit.prevent="submit" class="form">
-        <template v-if="mode === 'register'">
-          <div class="field">
-            <label>Полное имя</label>
+        <form @submit.prevent="submit">
+          <div v-if="mode === 'register'" class="field">
+            <label>ИМЯ СОТРУДНИКА</label>
             <input v-model="form.name" type="text" placeholder="Иван Петров" required />
           </div>
-        </template>
-        <div class="field">
-          <label>Email</label>
-          <input v-model="form.email" type="email" placeholder="you@company.com" required />
+          <div class="field">
+            <label>EMAIL</label>
+            <input v-model="form.email" type="email" placeholder="you@company.com" required />
+          </div>
+          <div class="field">
+            <label>ПАРОЛЬ</label>
+            <input v-model="form.password" type="password" placeholder="••••••••" required />
+          </div>
+
+          <div v-if="error" class="error-msg">⚠ {{ error }}</div>
+
+          <button type="submit" class="btn-submit" :disabled="loading">
+            <span v-if="loading" class="dot-loader"><span></span><span></span><span></span></span>
+            <span v-else>{{ mode === 'login' ? 'ВОЙТИ →' : 'ЗАРЕГИСТРИРОВАТЬСЯ →' }}</span>
+          </button>
+        </form>
+
+        <div class="hint">
+          <span class="hint-label">ADMIN</span>
+          <code>admin@company.com</code>
+          <span>/</span>
+          <code>Admin123456</code>
         </div>
-        <div class="field">
-          <label>Пароль</label>
-          <input v-model="form.password" type="password" placeholder="••••••••" required />
-        </div>
-
-        <div v-if="error" class="error-box">{{ error }}</div>
-
-        <button type="submit" class="btn-submit" :disabled="loading">
-          <span v-if="loading" class="spinner"></span>
-          <span v-else>{{ mode === 'login' ? 'Войти' : 'Зарегистрироваться' }}</span>
-        </button>
-      </form>
-
-      <p class="hint" v-if="mode === 'login'">
-        Администратор: <code>admin@company.com</code> / <code>Admin123456</code>
-      </p>
+      </div>
     </div>
   </div>
 </template>
@@ -60,9 +61,10 @@ const loading = ref(false);
 const error = ref('');
 const form = reactive({ name: '', email: '', password: '' });
 
+function switchMode(m) { mode.value = m; error.value = ''; }
+
 async function submit() {
-  error.value = '';
-  loading.value = true;
+  error.value = ''; loading.value = true;
   try {
     if (mode.value === 'login') {
       const user = await auth.login(form.email, form.password);
@@ -72,92 +74,94 @@ async function submit() {
       router.push('/dashboard');
     }
   } catch (e) {
-    error.value = typeof e === 'string' ? e : 'Ошибка. Проверьте данные.';
-  } finally {
-    loading.value = false;
-  }
+    error.value = typeof e === 'string' ? e : 'Ошибка';
+  } finally { loading.value = false; }
 }
 </script>
 
 <style scoped>
-.auth-wrap {
+.auth-root {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
   position: relative;
   overflow: hidden;
+  background: var(--c-black);
 }
-.auth-bg { position: fixed; inset: 0; pointer-events: none; }
-.grid-lines {
-  position: absolute; inset: 0;
-  background-image:
-    linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
+
+.auth-noise {
+  position: fixed; inset: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: 0.4;
 }
-.glow { position: absolute; border-radius: 50%; filter: blur(120px); }
-.glow-1 { width: 500px; height: 500px; top: -100px; left: -100px; background: var(--blue); opacity: 0.2; }
-.glow-2 { width: 400px; height: 400px; bottom: -80px; right: -80px; background: var(--accent); opacity: 0.1; }
+
+.auth-grid {
+  position: fixed; inset: 0; pointer-events: none;
+  background-image: linear-gradient(var(--c-800) 1px, transparent 1px), linear-gradient(90deg, var(--c-800) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.3;
+}
+
+.auth-wrap {
+  width: 100%; max-width: 420px; padding: 24px;
+  position: relative; z-index: 1;
+}
+
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 32px;
+}
+.brand-mark { font-size: 1.5rem; color: var(--accent); line-height: 1; }
+.brand-text { font-family: var(--font-display); font-weight: 900; font-size: 1.4rem; letter-spacing: 0.15em; color: var(--c-white); }
+.brand-ver { font-size: 0.65rem; color: var(--c-400); background: var(--c-700); padding: 2px 6px; border-radius: 3px; margin-left: 4px; }
 
 .auth-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  padding: 40px;
-  width: 100%;
-  max-width: 420px;
-  position: relative;
-  z-index: 1;
-  box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+  background: var(--c-900);
+  border: 1px solid var(--c-600);
+  border-radius: var(--r-lg);
+  padding: 32px;
+  box-shadow: 0 0 0 1px var(--c-700), 0 24px 48px rgba(0,0,0,0.6);
 }
 
-.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
-.brand-icon { font-size: 1.8rem; color: var(--accent); line-height: 1; }
-.brand-name { font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; letter-spacing: 0.12em; }
-
-.tabs { display: flex; background: var(--surface2); border-radius: 12px; padding: 4px; margin-bottom: 28px; }
+.tabs { display: flex; gap: 2px; background: var(--c-800); border-radius: var(--r); padding: 3px; margin-bottom: 28px; }
 .tab {
-  flex: 1; padding: 10px; border: none; background: transparent;
-  color: var(--muted); font-family: var(--font-display); font-size: 0.9rem;
-  font-weight: 600; cursor: pointer; border-radius: 10px; transition: all 0.2s;
+  flex: 1; padding: 9px; border: none; background: transparent;
+  color: var(--c-400); font-family: var(--font-display); font-size: 0.7rem;
+  font-weight: 700; letter-spacing: 0.1em; cursor: pointer; border-radius: 4px;
+  transition: all 0.15s;
 }
-.tab.active { background: var(--accent); color: #000; }
+.tab.active { background: var(--c-700); color: var(--accent); }
 
-.form { display: flex; flex-direction: column; gap: 16px; }
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field label { font-size: 0.78rem; font-weight: 500; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.08em; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; color: var(--c-400); margin-bottom: 6px; }
 .field input {
-  background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
-  padding: 12px 16px; color: var(--text); font-size: 0.95rem; transition: border-color 0.2s;
+  width: 100%; background: var(--c-800); border: 1px solid var(--c-600);
+  border-radius: var(--r); padding: 11px 14px; color: var(--c-100);
+  font-size: 0.9rem; transition: border-color 0.15s;
 }
 .field input:focus { outline: none; border-color: var(--accent); }
-.field input::placeholder { color: var(--muted); }
+.field input::placeholder { color: var(--c-500); }
 
-.error-box {
-  background: var(--red-dim); border: 1px solid rgba(255,77,109,0.3);
-  color: var(--red); padding: 10px 14px; border-radius: 8px; font-size: 0.88rem;
-}
+.error-msg { background: var(--red-dim); border: 1px solid var(--red); color: var(--red); padding: 10px 14px; border-radius: var(--r); font-size: 0.82rem; margin-bottom: 16px; }
 
 .btn-submit {
-  background: var(--accent); color: #000; border: none; border-radius: 10px;
-  padding: 14px; font-family: var(--font-display); font-size: 1rem; font-weight: 700;
-  cursor: pointer; transition: opacity 0.2s; display: flex; align-items: center;
-  justify-content: center; gap: 8px; margin-top: 4px;
+  width: 100%; padding: 13px; background: var(--accent); color: #000;
+  border: none; border-radius: var(--r); font-family: var(--font-display);
+  font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; cursor: pointer;
+  transition: all 0.15s; margin-top: 4px;
 }
-.btn-submit:hover { opacity: 0.9; }
-.btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-submit:hover { background: #d4ff1a; transform: translateY(-1px); }
+.btn-submit:active { transform: translateY(0); }
+.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-.spinner {
-  width: 18px; height: 18px;
-  border: 2px solid rgba(0,0,0,0.3);
-  border-top-color: #000;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
+.dot-loader { display: flex; gap: 4px; justify-content: center; align-items: center; }
+.dot-loader span { width: 6px; height: 6px; background: #000; border-radius: 50%; animation: bounce 0.6s infinite alternate; }
+.dot-loader span:nth-child(2) { animation-delay: 0.2s; }
+.dot-loader span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { to { transform: translateY(-4px); opacity: 0.5; } }
 
-.hint { margin-top: 20px; font-size: 0.8rem; color: var(--muted); text-align: center; }
-.hint code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; color: var(--muted2); font-size: 0.78rem; }
+.hint { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--c-700); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.75rem; color: var(--c-400); }
+.hint-label { background: var(--c-700); color: var(--c-300); padding: 2px 6px; border-radius: 3px; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.1em; }
+.hint code { background: var(--c-800); color: var(--c-200); padding: 2px 6px; border-radius: 3px; font-size: 0.72rem; }
 </style>

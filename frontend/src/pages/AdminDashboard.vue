@@ -1,65 +1,62 @@
 <template>
   <div class="page">
     <header class="header">
-      <div class="logo">
-        <span class="logo-icon">◈</span>
-        <span class="logo-name">TRACKER</span>
-        <span class="admin-badge">ADMIN</span>
-      </div>
+      <div class="logo"><span class="logo-mark">▣</span><span class="logo-text">TRACKER</span><span class="admin-badge">ADMIN</span></div>
       <div class="header-right">
-        <button class="btn-refresh" @click="load">🔄 Обновить</button>
-        <button class="btn-icon" @click="logout">Выйти</button>
+        <button class="btn-icon" @click="load">↻ ОБНОВИТЬ</button>
+        <button class="btn-logout" @click="logout">ВЫЙТИ</button>
       </div>
     </header>
 
     <main class="main">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value">{{ employees.length }}</div>
-          <div class="stat-label">Сотрудников</div>
+      <!-- STATS ROW -->
+      <div class="top-stats">
+        <div class="top-stat">
+          <div class="top-stat-val">{{ employees.length }}</div>
+          <div class="top-stat-label">СОТРУДНИКОВ</div>
         </div>
-        <div class="stat-card stat-active">
-          <div class="stat-value">{{ activeNow.length }}</div>
-          <div class="stat-label">Сейчас на объектах</div>
+        <div class="top-stat accent">
+          <div class="top-stat-val">{{ activeNow.length }}</div>
+          <div class="top-stat-label">НА ОБЪЕКТАХ</div>
         </div>
       </div>
 
-      <section class="section" v-if="activeNow.length">
-        <h3 class="section-title">🟢 Сейчас на объектах</h3>
+      <!-- ACTIVE NOW -->
+      <div v-if="activeNow.length" class="section">
+        <div class="section-title">● СЕЙЧАС НА ОБЪЕКТАХ</div>
         <div class="active-list">
           <div v-for="a in activeNow" :key="a.id" class="active-row">
-            <div class="active-person">
-              <div class="avatar">{{ a.user_name[0] }}</div>
-              <div>
-                <div class="active-name">{{ a.user_name }}</div>
-                <div class="active-object">📍 {{ a.object_name }}</div>
-              </div>
+            <div class="active-avatar">{{ a.user_name[0] }}</div>
+            <div class="active-info">
+              <div class="active-name">{{ a.user_name }}</div>
+              <div class="active-obj">📍 {{ a.object_name }}</div>
             </div>
-            <div class="active-time">с {{ fmtDate(a.arrived_at) }}</div>
+            <div class="active-time">с {{ fmtTime(a.arrived_at) }}</div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section class="section">
-        <h3 class="section-title">👥 Все сотрудники</h3>
-        <div v-if="loading" class="loading">Загрузка...</div>
-        <div v-else-if="!employees.length" class="empty">Нет зарегистрированных сотрудников</div>
-        <div v-else class="emp-grid">
-          <RouterLink v-for="e in employees" :key="e.id" :to="`/admin/employee/${e.id}`" class="emp-card">
+      <!-- EMPLOYEES LIST -->
+      <div class="section">
+        <div class="section-title">▦ ВСЕ СОТРУДНИКИ</div>
+        <div v-if="loading" class="loading">загрузка...</div>
+        <div v-else class="emp-list">
+          <RouterLink v-for="e in employees" :key="e.id" :to="`/admin/employee/${e.id}`" class="emp-row">
             <div class="emp-avatar">{{ e.name[0] }}</div>
             <div class="emp-info">
               <div class="emp-name">{{ e.name }}</div>
               <div class="emp-email">{{ e.email }}</div>
-              <div v-if="e.current_object" class="emp-status-on">🟢 {{ e.current_object }}</div>
-              <div v-else class="emp-status-off">⚪ Не на объекте</div>
+              <div v-if="e.current_object" class="emp-status on">● {{ e.current_object }}</div>
+              <div v-else class="emp-status off">○ не на объекте</div>
             </div>
             <div class="emp-meta">
+              <div class="emp-rate">{{ e.hourly_rate || 0 }} €/ч</div>
               <div class="emp-sessions">{{ e.total_sessions }} визитов</div>
               <div class="emp-arrow">→</div>
             </div>
           </RouterLink>
         </div>
-      </section>
+      </div>
     </main>
   </div>
 </template>
@@ -76,10 +73,7 @@ const employees = ref([]);
 const activeNow = ref([]);
 const loading = ref(true);
 
-function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
+function fmtTime(d) { if (!d) return '—'; return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
 
 async function load() {
   loading.value = true;
@@ -90,64 +84,59 @@ async function load() {
 }
 
 function logout() { auth.logout(); router.push('/auth'); }
-
 onMounted(load);
 </script>
 
 <style scoped>
-.page { min-height: 100vh; display: flex; flex-direction: column; }
+.page { min-height: 100vh; display: flex; flex-direction: column; background: var(--c-black); }
 
-.header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 32px; border-bottom: 1px solid var(--border);
-  background: var(--bg2); position: sticky; top: 0; z-index: 100;
-}
+.header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid var(--c-700); background: var(--c-900); position: sticky; top: 0; z-index: 100; }
 .logo { display: flex; align-items: center; gap: 8px; }
-.logo-icon { font-size: 1.4rem; color: var(--accent); }
-.logo-name { font-family: var(--font-display); font-weight: 800; font-size: 1.1rem; letter-spacing: 0.1em; }
-.admin-badge { background: var(--accent); color: #000; font-family: var(--font-display); font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; padding: 3px 8px; border-radius: 4px; }
-.header-right { display: flex; align-items: center; gap: 10px; }
-.btn-refresh { background: var(--surface); border: 1px solid var(--border); color: var(--muted2); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; }
-.btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
-.btn-icon { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 0.88rem; transition: all 0.2s; }
-.btn-icon:hover { border-color: var(--red); color: var(--red); }
+.logo-mark { font-size: 1.2rem; color: var(--accent); }
+.logo-text { font-family: var(--font-display); font-weight: 900; font-size: 1rem; letter-spacing: 0.12em; color: var(--c-white); }
+.admin-badge { background: var(--accent); color: #000; font-family: var(--font-display); font-size: 0.55rem; font-weight: 900; letter-spacing: 0.12em; padding: 3px 7px; border-radius: 3px; }
+.header-right { display: flex; gap: 8px; }
+.btn-icon { background: var(--c-800); border: 1px solid var(--c-600); color: var(--c-300); padding: 5px 12px; border-radius: var(--r); cursor: pointer; font-family: var(--font-display); font-size: 0.65rem; letter-spacing: 0.08em; transition: all 0.15s; }
+.btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+.btn-logout { background: transparent; border: 1px solid var(--c-600); color: var(--c-400); padding: 5px 12px; border-radius: var(--r); cursor: pointer; font-family: var(--font-display); font-size: 0.65rem; letter-spacing: 0.08em; transition: all 0.15s; }
+.btn-logout:hover { border-color: var(--red); color: var(--red); }
 
-.main { flex: 1; max-width: 900px; margin: 0 auto; width: 100%; padding: 32px 24px; display: flex; flex-direction: column; gap: 32px; }
+.main { flex: 1; max-width: 860px; margin: 0 auto; width: 100%; padding: 24px 16px; display: flex; flex-direction: column; gap: 24px; }
 
-.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; text-align: center; }
-.stat-active { background: var(--green-dim); border-color: rgba(0,229,160,0.25); }
-.stat-value { font-family: var(--font-display); font-size: 2.8rem; font-weight: 800; color: var(--accent); line-height: 1; }
-.stat-active .stat-value { color: var(--green); }
-.stat-label { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+.top-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.top-stat { background: var(--c-900); border: 1px solid var(--c-700); border-radius: var(--r-lg); padding: 20px; }
+.top-stat.accent { border-color: rgba(200,255,0,0.3); background: linear-gradient(135deg, rgba(200,255,0,0.04), var(--c-900)); }
+.top-stat-val { font-family: var(--font-display); font-size: 2.4rem; font-weight: 900; color: var(--accent); line-height: 1; }
+.top-stat-label { font-family: var(--font-display); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.15em; color: var(--c-400); margin-top: 6px; }
 
-.section-title { font-size: 1rem; margin-bottom: 14px; color: var(--muted2); font-weight: 700; }
-.loading, .empty { color: var(--muted); text-align: center; padding: 40px; }
+.section-title { font-family: var(--font-display); font-size: 0.65rem; font-weight: 700; letter-spacing: 0.15em; color: var(--c-400); margin-bottom: 12px; }
+.loading { color: var(--c-500); font-size: 0.82rem; padding: 24px; text-align: center; }
 
-.active-list { display: flex; flex-direction: column; gap: 10px; }
-.active-row { background: var(--green-dim); border: 1px solid rgba(0,229,160,0.2); border-radius: 12px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.active-person { display: flex; align-items: center; gap: 12px; }
-.avatar { width: 38px; height: 38px; background: var(--green); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 800; font-size: 1rem; }
-.active-name { font-weight: 600; font-size: 0.95rem; }
-.active-object { font-size: 0.83rem; color: var(--muted2); }
-.active-time { font-size: 0.83rem; color: var(--green); white-space: nowrap; }
+.active-list { display: flex; flex-direction: column; gap: 8px; }
+.active-row { display: flex; align-items: center; gap: 12px; background: rgba(0,230,118,0.04); border: 1px solid rgba(0,230,118,0.2); border-radius: var(--r); padding: 12px 16px; flex-wrap: wrap; }
+.active-avatar { width: 36px; height: 36px; background: var(--green); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 900; font-size: 1rem; flex-shrink: 0; }
+.active-info { flex: 1; }
+.active-name { font-weight: 600; font-size: 0.9rem; color: var(--c-white); }
+.active-obj { font-size: 0.78rem; color: var(--c-400); margin-top: 2px; }
+.active-time { font-size: 0.75rem; color: var(--green); white-space: nowrap; }
 
-.emp-grid { display: flex; flex-direction: column; gap: 8px; }
-.emp-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; display: flex; align-items: center; gap: 16px; text-decoration: none; color: inherit; transition: all 0.2s; }
-.emp-card:hover { border-color: var(--accent); background: var(--accent-dim); }
-.emp-avatar { width: 46px; height: 46px; background: var(--surface2); border: 1px solid var(--border2); color: var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 800; font-size: 1.2rem; flex-shrink: 0; }
+.emp-list { display: flex; flex-direction: column; gap: 6px; }
+.emp-row { display: flex; align-items: center; gap: 14px; background: var(--c-900); border: 1px solid var(--c-700); border-radius: var(--r); padding: 14px 18px; text-decoration: none; color: inherit; transition: all 0.15s; }
+.emp-row:hover { border-color: var(--accent); background: rgba(200,255,0,0.03); }
+.emp-avatar { width: 40px; height: 40px; background: var(--c-700); border: 1px solid var(--c-600); color: var(--accent); border-radius: var(--r); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 900; font-size: 1.1rem; flex-shrink: 0; }
 .emp-info { flex: 1; }
-.emp-name { font-weight: 700; font-size: 0.97rem; }
-.emp-email { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
-.emp-status-on { font-size: 0.8rem; color: var(--green); margin-top: 4px; }
-.emp-status-off { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
-.emp-meta { display: flex; align-items: center; gap: 14px; }
-.emp-sessions { font-size: 0.8rem; color: var(--muted2); white-space: nowrap; }
-.emp-arrow { color: var(--muted); font-size: 1.1rem; }
+.emp-name { font-weight: 600; font-size: 0.92rem; color: var(--c-white); }
+.emp-email { font-size: 0.75rem; color: var(--c-400); margin-top: 2px; }
+.emp-status { font-size: 0.72rem; margin-top: 4px; }
+.emp-status.on { color: var(--green); }
+.emp-status.off { color: var(--c-500); }
+.emp-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.emp-rate { font-family: var(--font-display); font-size: 0.8rem; font-weight: 700; color: var(--accent); }
+.emp-sessions { font-size: 0.72rem; color: var(--c-400); }
+.emp-arrow { color: var(--c-500); font-size: 1rem; }
 
-@media (max-width: 600px) {
-  .header { padding: 14px 16px; }
-  .main { padding: 20px 16px; }
-  .stats-grid { grid-template-columns: 1fr; }
+@media (max-width: 500px) {
+  .top-stats { grid-template-columns: 1fr; }
+  .header { padding: 12px 16px; }
 }
 </style>

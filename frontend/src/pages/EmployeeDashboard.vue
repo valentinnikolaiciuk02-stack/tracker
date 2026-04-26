@@ -1,74 +1,116 @@
 <template>
   <div class="page">
     <header class="header">
-      <div class="logo">
-        <span class="logo-icon">◈</span>
-        <span class="logo-name">TRACKER</span>
-      </div>
+      <div class="logo"><span class="logo-mark">▣</span><span class="logo-text">TRACKER</span></div>
       <div class="header-right">
-        <span class="user-badge">👤 {{ auth.user?.name }}</span>
-        <button class="btn-icon" @click="logout">Выйти</button>
+        <span class="user-chip">{{ auth.user?.name }}</span>
+        <button class="btn-logout" @click="logout">ВЫЙТИ</button>
       </div>
     </header>
 
     <main class="main">
-      <!-- ACTIVE SESSION -->
-      <div v-if="activeSession" class="status-card active-card">
-        <div class="status-tag tag-active">🟢 На объекте</div>
-        <h2 class="status-object">{{ activeSession.object_name }}</h2>
-        <p class="status-time">Прибыл: {{ fmtDate(activeSession.arrived_at) }}</p>
-        <button class="btn-action btn-leave" @click="leave" :disabled="actionLoading">
-          <span v-if="actionLoading" class="spinner-w"></span>
-          <span v-else>🚪 Покинуть объект</span>
+      <!-- STATUS BLOCK -->
+      <div v-if="activeSession" class="status-block status-work">
+        <div class="status-row">
+          <div class="status-indicator work"></div>
+          <span class="status-label">НА ОБЪЕКТЕ</span>
+        </div>
+        <div class="status-object">{{ activeSession.object_name }}</div>
+        <div class="status-since">с {{ fmtTime(activeSession.arrived_at) }} · {{ elapsed(activeSession.arrived_at) }}</div>
+        <button class="btn-action btn-red" @click="leave" :disabled="actionLoading">
+          {{ actionLoading ? '...' : '⬛ ПОКИНУТЬ ОБЪЕКТ' }}
         </button>
       </div>
 
-      <!-- IDLE - ARRIVE FORM -->
-      <div v-else class="status-card idle-card">
-        <div class="status-tag tag-idle">⚪ Не на объекте</div>
-        <h2 class="form-title">Прибыть на объект</h2>
+      <div v-else-if="activeTravel" class="status-block status-travel">
+        <div class="status-row">
+          <div class="status-indicator travel"></div>
+          <span class="status-label">В ДОРОГЕ</span>
+        </div>
+        <div class="status-object">от: {{ activeTravel.from_object_name || 'объект' }}</div>
+        <div class="status-since">с {{ fmtTime(activeTravel.started_at) }} · {{ elapsed(activeTravel.started_at) }}</div>
 
-        <div class="field">
-          <label>Выберите объект</label>
+        <div class="arrive-form">
+          <label class="field-label">ПРИБЫТЬ НА ОБЪЕКТ</label>
           <select v-model="selectedObject" class="field-select">
             <option value="">— выберите объект —</option>
             <option v-for="o in objects" :key="o.id" :value="o.id">{{ o.name }}</option>
-            <option value="new">✏️ Новый объект...</option>
+            <option value="new">✏ Новый объект...</option>
           </select>
+          <input v-if="selectedObject === 'new'" v-model="newObjectName" type="text" placeholder="Название объекта" class="field-input" />
+          <div v-if="formError" class="error-msg">⚠ {{ formError }}</div>
+          <button class="btn-action btn-green" @click="arrive" :disabled="actionLoading">
+            {{ actionLoading ? '...' : '▶ ПРИБЫЛ НА ОБЪЕКТ' }}
+          </button>
         </div>
+      </div>
 
-        <div v-if="selectedObject === 'new'" class="field">
-          <label>Название нового объекта</label>
-          <input v-model="newObjectName" type="text" placeholder="Например: Склад Б" class="field-input" />
+      <div v-else class="status-block status-idle">
+        <div class="status-row">
+          <div class="status-indicator idle"></div>
+          <span class="status-label">НЕ НА ОБЪЕКТЕ</span>
         </div>
+        <div class="arrive-form">
+          <label class="field-label">ВЫБРАТЬ ОБЪЕКТ</label>
+          <select v-model="selectedObject" class="field-select">
+            <option value="">— выберите объект —</option>
+            <option v-for="o in objects" :key="o.id" :value="o.id">{{ o.name }}</option>
+            <option value="new">✏ Новый объект...</option>
+          </select>
+          <input v-if="selectedObject === 'new'" v-model="newObjectName" type="text" placeholder="Название объекта" class="field-input" />
+          <div v-if="formError" class="error-msg">⚠ {{ formError }}</div>
+          <button class="btn-action btn-green" @click="arrive" :disabled="actionLoading">
+            {{ actionLoading ? '...' : '▶ ПРИБЫЛ НА ОБЪЕКТ' }}
+          </button>
+        </div>
+      </div>
 
-        <div v-if="formError" class="error-box">{{ formError }}</div>
-        <button class="btn-action btn-arrive" @click="arrive" :disabled="actionLoading">
-          <span v-if="actionLoading" class="spinner-w"></span>
-          <span v-else>✅ Я прибыл на объект</span>
-        </button>
+      <!-- STATS -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-period">СЕГОДНЯ</div>
+          <div class="stat-row"><span class="stat-k">Работа</span><span class="stat-v work">{{ fmtDur(stats.day?.work_minutes) }}</span></div>
+          <div class="stat-row"><span class="stat-k">Дорога</span><span class="stat-v travel">{{ fmtDur(stats.day?.travel_minutes) }}</span></div>
+          <div class="stat-earn">{{ stats.day?.earnings }} €</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-period">НЕДЕЛЯ</div>
+          <div class="stat-row"><span class="stat-k">Работа</span><span class="stat-v work">{{ fmtDur(stats.week?.work_minutes) }}</span></div>
+          <div class="stat-row"><span class="stat-k">Дорога</span><span class="stat-v travel">{{ fmtDur(stats.week?.travel_minutes) }}</span></div>
+          <div class="stat-earn">{{ stats.week?.earnings }} €</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-period">МЕСЯЦ</div>
+          <div class="stat-row"><span class="stat-k">Работа</span><span class="stat-v work">{{ fmtDur(stats.month?.work_minutes) }}</span></div>
+          <div class="stat-row"><span class="stat-k">Дорога</span><span class="stat-v travel">{{ fmtDur(stats.month?.travel_minutes) }}</span></div>
+          <div class="stat-earn">{{ stats.month?.earnings }} €</div>
+        </div>
       </div>
 
       <!-- HISTORY -->
       <div class="section">
         <div class="section-header">
-          <h3>История перемещений</h3>
-          <div class="date-filters">
-            <button v-for="f in filters" :key="f.val" :class="['filter-btn', { active: dateFilter === f.val }]" @click="setFilter(f.val)">{{ f.label }}</button>
+          <span class="section-title">ИСТОРИЯ</span>
+          <div class="filter-tabs">
+            <button v-for="f in filters" :key="f.val" :class="['ftab', { active: dateFilter === f.val }]" @click="setFilter(f.val)">{{ f.label }}</button>
           </div>
         </div>
 
-        <div v-if="histLoading" class="loading">Загрузка...</div>
-        <div v-else-if="!history.length" class="empty">Записей нет за выбранный период</div>
-        <div v-else class="history-list">
-          <div v-for="s in history" :key="s.id" class="hist-row">
-            <div class="hist-obj">📍 {{ s.object_name }}</div>
-            <div class="hist-times">
-              <span class="time-arrive">🟢 {{ fmtDate(s.arrived_at) }}</span>
-              <span v-if="s.left_at" class="time-leave">🔴 {{ fmtDate(s.left_at) }}</span>
-              <span v-else class="time-active">⏳ Ещё на объекте</span>
+        <div v-if="histLoading" class="loading">загрузка...</div>
+        <div v-else-if="!timeline.length" class="empty">нет записей</div>
+        <div v-else class="timeline">
+          <div v-for="item in timeline" :key="item.type + item.id" :class="['timeline-item', item.type]">
+            <div class="tl-marker"></div>
+            <div class="tl-content">
+              <div class="tl-type">{{ item.type === 'work' ? '🏗 РАБОТА' : '🚗 ДОРОГА' }}</div>
+              <div class="tl-name">{{ item.type === 'work' ? item.object_name : `от: ${item.from_object_name || '—'}` }}</div>
+              <div class="tl-times">
+                <span>{{ fmtDateTime(item.type === 'work' ? item.arrived_at : item.started_at) }}</span>
+                <span class="tl-arrow">→</span>
+                <span>{{ (item.type === 'work' ? item.left_at : item.ended_at) ? fmtDateTime(item.type === 'work' ? item.left_at : item.ended_at) : '<span class="tl-active">сейчас</span>' }}</span>
+              </div>
+              <div class="tl-dur">⏱ {{ fmtDur(item.duration_minutes) }}</div>
             </div>
-            <div v-if="s.left_at" class="hist-dur">⏱ {{ duration(s.arrived_at, s.left_at) }}</div>
           </div>
         </div>
       </div>
@@ -77,7 +119,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth.js';
 import api from '../lib/api.js';
@@ -86,187 +128,225 @@ const auth = useAuthStore();
 const router = useRouter();
 
 const activeSession = ref(null);
+const activeTravel = ref(null);
 const objects = ref([]);
 const selectedObject = ref('');
 const newObjectName = ref('');
 const formError = ref('');
 const actionLoading = ref(false);
-const history = ref([]);
+const history = ref({ sessions: [], travels: [] });
+const stats = ref({ day: {}, week: {}, month: {} });
 const histLoading = ref(false);
 const dateFilter = ref('all');
+let timer = null;
+const tick = ref(0);
 
 const filters = [
-  { label: 'Всё', val: 'all' },
-  { label: 'Сегодня', val: 'day' },
-  { label: 'Неделя', val: 'week' },
-  { label: 'Месяц', val: 'month' },
+  { label: 'ВСЁ', val: 'all' },
+  { label: 'ДЕНЬ', val: 'day' },
+  { label: 'НЕДЕЛЯ', val: 'week' },
+  { label: 'МЕСЯЦ', val: 'month' },
 ];
 
-function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
+const timeline = computed(() => {
+  const works = (history.value.sessions || []).map(s => ({ ...s, type: 'work' }));
+  const travels = (history.value.travels || []).map(t => ({ ...t, type: 'travel' }));
+  return [...works, ...travels].sort((a, b) => {
+    const da = new Date(a.type === 'work' ? a.arrived_at : a.started_at);
+    const db2 = new Date(b.type === 'work' ? b.arrived_at : b.started_at);
+    return db2 - da;
+  });
+});
 
-function duration(a, b) {
-  const diff = Math.floor((new Date(b) - new Date(a)) / 60000);
-  const h = Math.floor(diff / 60), m = diff % 60;
-  return h > 0 ? `${h}ч ${m}м` : `${m}м`;
+function fmtTime(d) { if (!d) return '—'; return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
+function fmtDateTime(d) { if (!d) return '—'; return new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+function fmtDur(m) {
+  if (!m && m !== 0) return '—';
+  m = Math.max(0, Math.round(m));
+  const h = Math.floor(m / 60), min = m % 60;
+  return h > 0 ? `${h}ч ${min}м` : `${min}м`;
+}
+function elapsed(d) {
+  tick.value;
+  if (!d) return '';
+  const diff = Math.floor((Date.now() - new Date(d)) / 60000);
+  return fmtDur(diff);
 }
 
 function getDateRange(filter) {
   const now = new Date();
-  if (filter === 'day') return { from: now.toISOString().slice(0,10), to: now.toISOString().slice(0,10) };
-  if (filter === 'week') {
-    const from = new Date(now); from.setDate(now.getDate() - 7);
-    return { from: from.toISOString().slice(0,10), to: now.toISOString().slice(0,10) };
-  }
-  if (filter === 'month') {
-    const from = new Date(now); from.setMonth(now.getMonth() - 1);
-    return { from: from.toISOString().slice(0,10), to: now.toISOString().slice(0,10) };
-  }
+  if (filter === 'day') return { from: now.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) };
+  if (filter === 'week') { const f = new Date(now); f.setDate(now.getDate() - 7); return { from: f.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }; }
+  if (filter === 'month') { const f = new Date(now); f.setMonth(now.getMonth() - 1); return { from: f.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }; }
   return {};
 }
 
 async function loadHistory() {
   histLoading.value = true;
-  try {
-    const data = await api.get('/sessions/history', { params: getDateRange(dateFilter.value) });
-    history.value = data.sessions;
-  } finally {
-    histLoading.value = false;
-  }
+  const data = await api.get('/sessions/history', { params: getDateRange(dateFilter.value) });
+  history.value = data;
+  histLoading.value = false;
 }
 
-async function setFilter(val) {
-  dateFilter.value = val;
-  await loadHistory();
+async function loadStats() {
+  const data = await api.get('/sessions/stats');
+  stats.value = data;
 }
+
+async function setFilter(val) { dateFilter.value = val; await loadHistory(); }
 
 async function arrive() {
   formError.value = '';
   let objectId = selectedObject.value;
   if (!objectId) { formError.value = 'Выберите объект'; return; }
-
   actionLoading.value = true;
   try {
     if (objectId === 'new') {
-      if (!newObjectName.value.trim()) { formError.value = 'Введите название объекта'; actionLoading.value = false; return; }
+      if (!newObjectName.value.trim()) { formError.value = 'Введите название'; actionLoading.value = false; return; }
       const d = await api.post('/objects', { name: newObjectName.value.trim() });
       objectId = d.object.id;
       if (!objects.value.find(o => o.id === d.object.id)) objects.value.push(d.object);
     }
     const data = await api.post('/sessions/arrive', { object_id: objectId });
     activeSession.value = data.session;
-    selectedObject.value = '';
-    newObjectName.value = '';
-    await loadHistory();
-  } catch (e) {
-    formError.value = typeof e === 'string' ? e : 'Ошибка';
-  } finally {
-    actionLoading.value = false;
-  }
+    activeTravel.value = null;
+    selectedObject.value = ''; newObjectName.value = '';
+    await loadHistory(); await loadStats();
+  } catch (e) { formError.value = typeof e === 'string' ? e : 'Ошибка'; }
+  finally { actionLoading.value = false; }
 }
 
 async function leave() {
   actionLoading.value = true;
   try {
-    await api.post('/sessions/leave');
+    const data = await api.post('/sessions/leave');
     activeSession.value = null;
-    await loadHistory();
-  } catch (e) {
-    console.error(e);
-  } finally {
-    actionLoading.value = false;
-  }
+    activeTravel.value = data.travel;
+    await loadHistory(); await loadStats();
+  } catch (e) { console.error(e); }
+  finally { actionLoading.value = false; }
 }
 
-function logout() {
-  auth.logout();
-  router.push('/auth');
-}
+function logout() { auth.logout(); router.push('/auth'); }
 
 onMounted(async () => {
   const [sess, objs] = await Promise.all([api.get('/sessions/current'), api.get('/objects')]);
   activeSession.value = sess.session;
   objects.value = objs.objects;
+
+  // Check for active travel
+  try {
+    const hist = await api.get('/sessions/history', { params: { from: new Date().toISOString().slice(0,10), to: new Date().toISOString().slice(0,10) } });
+    const activeTrav = (hist.travels || []).find(t => t.status === 'active');
+    if (!activeSession.value && activeTrav) activeTravel.value = activeTrav;
+  } catch {}
+
   await loadHistory();
+  await loadStats();
+
+  timer = setInterval(() => { tick.value++; }, 30000);
 });
+
+onUnmounted(() => clearInterval(timer));
 </script>
 
 <style scoped>
-.page { min-height: 100vh; display: flex; flex-direction: column; }
+.page { min-height: 100vh; display: flex; flex-direction: column; background: var(--c-black); }
 
 .header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 32px; border-bottom: 1px solid var(--border);
-  background: var(--bg2); position: sticky; top: 0; z-index: 100;
+  padding: 16px 24px; border-bottom: 1px solid var(--c-700);
+  background: var(--c-900); position: sticky; top: 0; z-index: 100;
 }
 .logo { display: flex; align-items: center; gap: 8px; }
-.logo-icon { font-size: 1.4rem; color: var(--accent); }
-.logo-name { font-family: var(--font-display); font-weight: 800; font-size: 1.1rem; letter-spacing: 0.1em; }
-.header-right { display: flex; align-items: center; gap: 12px; }
-.user-badge { background: var(--surface2); border: 1px solid var(--border); padding: 6px 14px; border-radius: 8px; font-size: 0.88rem; color: var(--muted2); }
-.btn-icon { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 0.88rem; transition: all 0.2s; }
-.btn-icon:hover { border-color: var(--red); color: var(--red); }
+.logo-mark { font-size: 1.2rem; color: var(--accent); }
+.logo-text { font-family: var(--font-display); font-weight: 900; font-size: 1rem; letter-spacing: 0.12em; color: var(--c-white); }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.user-chip { background: var(--c-700); color: var(--c-300); padding: 5px 12px; border-radius: var(--r); font-size: 0.78rem; }
+.btn-logout { background: transparent; border: 1px solid var(--c-600); color: var(--c-400); padding: 5px 12px; border-radius: var(--r); cursor: pointer; font-size: 0.72rem; font-family: var(--font-display); letter-spacing: 0.08em; transition: all 0.15s; }
+.btn-logout:hover { border-color: var(--red); color: var(--red); }
 
-.main { flex: 1; max-width: 700px; margin: 0 auto; width: 100%; padding: 32px 24px; display: flex; flex-direction: column; gap: 28px; }
+.main { flex: 1; max-width: 680px; margin: 0 auto; width: 100%; padding: 24px 16px; display: flex; flex-direction: column; gap: 20px; }
 
-.status-card { border-radius: var(--radius); padding: 28px; border: 1px solid var(--border); }
-.active-card { background: linear-gradient(135deg, rgba(0,229,160,0.05), rgba(0,229,160,0.02)); border-color: rgba(0,229,160,0.25); }
-.idle-card { background: var(--surface); display: flex; flex-direction: column; gap: 14px; }
+/* Status blocks */
+.status-block { border-radius: var(--r-lg); padding: 24px; border: 1px solid var(--c-600); background: var(--c-900); }
+.status-work { border-color: rgba(0,230,118,0.3); background: linear-gradient(135deg, rgba(0,230,118,0.04), var(--c-900)); }
+.status-travel { border-color: rgba(255,171,0,0.3); background: linear-gradient(135deg, rgba(255,171,0,0.04), var(--c-900)); }
+.status-idle { border-color: var(--c-600); }
 
-.status-tag { display: inline-block; padding: 5px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; margin-bottom: 12px; }
-.tag-active { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,229,160,0.3); }
-.tag-idle { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+.status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.status-indicator { width: 8px; height: 8px; border-radius: 50%; }
+.status-indicator.work { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+.status-indicator.travel { background: var(--amber); box-shadow: 0 0 8px var(--amber); animation: pulse 2s infinite; }
+.status-indicator.idle { background: var(--c-500); }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-.status-object { font-size: 1.5rem; margin-bottom: 8px; }
-.status-time { color: var(--muted2); font-size: 0.9rem; margin-bottom: 20px; }
-.form-title { font-size: 1.1rem; font-weight: 700; }
+.status-label { font-family: var(--font-display); font-size: 0.65rem; font-weight: 700; letter-spacing: 0.15em; color: var(--c-400); }
+.status-object { font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; color: var(--c-white); margin-bottom: 6px; }
+.status-since { font-size: 0.78rem; color: var(--c-400); margin-bottom: 20px; }
 
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field label { font-size: 0.78rem; font-weight: 500; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.08em; }
+.arrive-form { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.field-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; color: var(--c-400); }
 .field-select, .field-input {
-  width: 100%; background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 10px; padding: 12px 16px; color: var(--text); font-size: 0.95rem;
-  transition: border-color 0.2s; appearance: none;
+  width: 100%; background: var(--c-800); border: 1px solid var(--c-600);
+  border-radius: var(--r); padding: 11px 14px; color: var(--c-100);
+  font-size: 0.88rem; appearance: none; transition: border-color 0.15s;
 }
-.field-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%236b72a0' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px; }
 .field-select:focus, .field-input:focus { outline: none; border-color: var(--accent); }
-.field-input::placeholder { color: var(--muted); }
-.field-select option { background: var(--surface2); }
+.field-input::placeholder { color: var(--c-500); }
 
-.error-box { background: var(--red-dim); border: 1px solid rgba(255,77,109,0.3); color: var(--red); padding: 10px 14px; border-radius: 8px; font-size: 0.88rem; }
+.error-msg { background: var(--red-dim); border: 1px solid var(--red); color: var(--red); padding: 8px 12px; border-radius: var(--r); font-size: 0.8rem; }
 
-.btn-action { border: none; border-radius: 12px; padding: 14px 24px; font-family: var(--font-display); font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
-.btn-action:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-arrive { background: var(--accent); color: #000; }
-.btn-arrive:hover:not(:disabled) { opacity: 0.9; }
-.btn-leave { background: var(--red); color: #fff; margin-top: 8px; }
-.btn-leave:hover:not(:disabled) { background: #e03356; }
+.btn-action {
+  width: 100%; padding: 13px; border: none; border-radius: var(--r);
+  font-family: var(--font-display); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s;
+}
+.btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-green { background: var(--green); color: #000; }
+.btn-green:hover:not(:disabled) { background: #00f588; transform: translateY(-1px); }
+.btn-red { background: var(--red); color: #fff; }
+.btn-red:hover:not(:disabled) { background: #ff5555; transform: translateY(-1px); }
 
-.spinner-w { width: 18px; height: 18px; border: 2px solid rgba(0,0,0,0.2); border-top-color: currentColor; border-radius: 50%; animation: spin 0.6s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+/* Stats */
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.stat-card { background: var(--c-900); border: 1px solid var(--c-700); border-radius: var(--r-lg); padding: 16px; }
+.stat-period { font-family: var(--font-display); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.15em; color: var(--c-400); margin-bottom: 12px; }
+.stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.stat-k { font-size: 0.72rem; color: var(--c-400); }
+.stat-v { font-size: 0.78rem; font-weight: 700; }
+.stat-v.work { color: var(--green); }
+.stat-v.travel { color: var(--amber); }
+.stat-earn { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; color: var(--accent); margin-top: 10px; border-top: 1px solid var(--c-700); padding-top: 8px; }
 
+/* History */
 .section { display: flex; flex-direction: column; gap: 14px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
-.section-header h3 { font-size: 1.05rem; }
-.date-filters { display: flex; gap: 6px; }
-.filter-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-family: var(--font-display); font-weight: 600; transition: all 0.2s; }
-.filter-btn.active, .filter-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.section-title { font-family: var(--font-display); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.15em; color: var(--c-400); }
+.filter-tabs { display: flex; gap: 4px; }
+.ftab { background: var(--c-800); border: 1px solid var(--c-600); color: var(--c-400); padding: 5px 10px; border-radius: var(--r); cursor: pointer; font-family: var(--font-display); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; transition: all 0.15s; }
+.ftab.active, .ftab:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 
-.loading, .empty { color: var(--muted); text-align: center; padding: 40px; font-size: 0.9rem; }
-.history-list { display: flex; flex-direction: column; gap: 10px; }
-.hist-row { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; transition: border-color 0.2s; }
-.hist-row:hover { border-color: var(--border2); }
-.hist-obj { font-weight: 600; font-size: 0.97rem; margin-bottom: 8px; }
-.hist-times { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 4px; }
-.time-arrive, .time-leave, .time-active { font-size: 0.84rem; color: var(--muted2); }
-.time-active { color: var(--amber); }
-.hist-dur { font-size: 0.82rem; color: var(--blue); margin-top: 4px; }
+.loading, .empty { color: var(--c-500); font-size: 0.82rem; padding: 24px; text-align: center; }
 
-@media (max-width: 600px) {
-  .header { padding: 14px 16px; }
-  .main { padding: 20px 16px; }
-  .hist-times { flex-direction: column; gap: 4px; }
+.timeline { display: flex; flex-direction: column; gap: 0; }
+.timeline-item { display: flex; gap: 14px; padding-bottom: 16px; position: relative; }
+.timeline-item:not(:last-child)::before { content: ''; position: absolute; left: 7px; top: 16px; bottom: 0; width: 1px; background: var(--c-700); }
+.tl-marker { width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; margin-top: 2px; border: 2px solid; }
+.timeline-item.work .tl-marker { background: var(--green-dim); border-color: var(--green); }
+.timeline-item.travel .tl-marker { background: var(--amber-dim); border-color: var(--amber); }
+.tl-content { flex: 1; background: var(--c-900); border: 1px solid var(--c-700); border-radius: var(--r); padding: 12px 14px; }
+.tl-type { font-family: var(--font-display); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em; margin-bottom: 4px; }
+.timeline-item.work .tl-type { color: var(--green); }
+.timeline-item.travel .tl-type { color: var(--amber); }
+.tl-name { font-size: 0.9rem; color: var(--c-white); margin-bottom: 6px; font-weight: 500; }
+.tl-times { font-size: 0.75rem; color: var(--c-400); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tl-arrow { color: var(--c-600); }
+.tl-active { color: var(--green); }
+.tl-dur { font-size: 0.72rem; color: var(--blue); margin-top: 4px; }
+
+@media (max-width: 500px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .header { padding: 12px 16px; }
 }
 </style>
