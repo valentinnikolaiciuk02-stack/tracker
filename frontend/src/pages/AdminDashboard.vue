@@ -77,8 +77,8 @@ const loading = ref(true);
 function fmtTime(d) { if (!d) return '—'; return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
 
 async function deleteEmp(e) {
-  if (!confirm(`Удалить сотрудника ${e.name}? Все его данные будут удалены.`)) return;
-  await api.delete(`/admin/employees/${e.id}`);
+  if (!confirm("Удалить " + e.name + "? Все данные будут удалены.")) return;
+  await api.delete("/admin/employees/" + e.id);
   await load();
 }
 
@@ -139,6 +139,8 @@ onMounted(load);
 .emp-status.off { color: var(--c-500); }
 .emp-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .emp-rate { font-family: var(--font-display); font-size: 0.8rem; font-weight: 700; color: var(--accent); }
+.btn-del { background: transparent; border: 1px solid #3a1a1a; color: #663333; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; transition: all 0.15s; flex-shrink: 0; margin-left: 4px; }
+.btn-del:hover { background: #3a1a1a; color: #ff5555; border-color: #ff3333; }
 .emp-sessions { font-size: 0.72rem; color: var(--c-400); }
 .emp-arrow { color: var(--c-500); font-size: 1rem; }
 .btn-del { background: transparent; border: 1px solid #3a1a1a; color: #663333; width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; transition: all 0.15s; flex-shrink: 0; }
