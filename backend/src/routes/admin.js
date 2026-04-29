@@ -51,5 +51,14 @@ export function adminRoutes(db) {
     res.json({ active: db.getAllActiveSessions() });
   });
 
+  router.delete('/employees/:id', async (req, res) => {
+    const { id } = req.params;
+    const user = await db.getUserById(id);
+    if (!user) return res.status(404).json({ error: 'Сотрудник не найден' });
+    await db.deleteEmployee(id);
+    res.json({ ok: true });
+  });
+
   return router;
 }
+// delete employee - added separately

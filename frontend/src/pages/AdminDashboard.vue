@@ -53,6 +53,7 @@
               <div class="emp-rate">{{ e.hourly_rate || 0 }} €/ч</div>
               <div class="emp-sessions">{{ e.total_sessions }} визитов</div>
               <div class="emp-arrow">→</div>
+            <button class="btn-del" @click.prevent="deleteEmp(e)" title="Удалить">✕</button>
             </div>
           </RouterLink>
         </div>
@@ -74,6 +75,12 @@ const activeNow = ref([]);
 const loading = ref(true);
 
 function fmtTime(d) { if (!d) return '—'; return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
+
+async function deleteEmp(e) {
+  if (!confirm(`Удалить сотрудника ${e.name}? Все его данные будут удалены.`)) return;
+  await api.delete(`/admin/employees/${e.id}`);
+  await load();
+}
 
 async function load() {
   loading.value = true;
@@ -134,6 +141,8 @@ onMounted(load);
 .emp-rate { font-family: var(--font-display); font-size: 0.8rem; font-weight: 700; color: var(--accent); }
 .emp-sessions { font-size: 0.72rem; color: var(--c-400); }
 .emp-arrow { color: var(--c-500); font-size: 1rem; }
+.btn-del { background: transparent; border: 1px solid #3a1a1a; color: #663333; width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; transition: all 0.15s; flex-shrink: 0; }
+.btn-del:hover { background: #3a1a1a; color: #ff5555; border-color: #ff3333; }
 
 @media (max-width: 500px) {
   .top-stats { grid-template-columns: 1fr; }

@@ -187,6 +187,12 @@ const db = {
       (SELECT COUNT(*) FROM sessions WHERE user_id=u.id) as total_sessions
     FROM users u WHERE u.role='employee' ORDER BY u.name`),
 
+  deleteEmployee: async (id) => {
+    await query('DELETE FROM travel_records WHERE user_id=$1', [id]);
+    await query('DELETE FROM sessions WHERE user_id=$1', [id]);
+    await query('DELETE FROM users WHERE id=$1', [id]);
+  },
+
   getAllActiveSessions: () => query(`
     SELECT s.id,s.arrived_at,u.name as user_name,u.id as user_id,o.name as object_name
     FROM sessions s JOIN users u ON s.user_id=u.id JOIN objects o ON s.object_id=o.id
