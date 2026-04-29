@@ -43,18 +43,18 @@ sqlDb.run(`
     password TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'employee',
     hourly_rate REAL NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now', '+2 hours'))
   );
   CREATE TABLE IF NOT EXISTS objects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
-    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now', '+2 hours'))
   );
   CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     object_id INTEGER NOT NULL,
-    arrived_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    arrived_at TEXT NOT NULL DEFAULT (datetime('now', '+2 hours')),
     left_at TEXT,
     status TEXT NOT NULL DEFAULT 'active',
     FOREIGN KEY (user_id) REFERENCES users(id),
@@ -64,7 +64,7 @@ sqlDb.run(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     from_object_id INTEGER,
-    started_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    started_at TEXT NOT NULL DEFAULT (datetime('now', '+2 hours')),
     ended_at TEXT,
     status TEXT NOT NULL DEFAULT 'active',
     FOREIGN KEY (user_id) REFERENCES users(id),
@@ -116,9 +116,9 @@ const db = {
 
   getSession: (id) => queryOne(`SELECT s.*, o.name as object_name FROM sessions s JOIN objects o ON s.object_id = o.id WHERE s.id = ?`, [id]),
   getActiveSession: (userId) => queryOne(`SELECT s.*, o.name as object_name FROM sessions s JOIN objects o ON s.object_id = o.id WHERE s.user_id = ? AND s.status = 'active' ORDER BY s.arrived_at DESC LIMIT 1`, [userId]),
-  createSession: (userId, objectId) => run(`INSERT INTO sessions (user_id, object_id, arrived_at, status) VALUES (?, ?, datetime('now', 'localtime'), 'active')`, [userId, objectId]),
-  closeSession: (id) => run(`UPDATE sessions SET status = 'closed', left_at = datetime('now', 'localtime') WHERE id = ?`, [id]),
-  closeActiveSession: (userId) => run(`UPDATE sessions SET status = 'closed', left_at = datetime('now', 'localtime') WHERE user_id = ? AND status = 'active'`, [userId]),
+  createSession: (userId, objectId) => run(`INSERT INTO sessions (user_id, object_id, arrived_at, status) VALUES (?, ?, datetime('now', '+2 hours'), 'active')`, [userId, objectId]),
+  closeSession: (id) => run(`UPDATE sessions SET status = 'closed', left_at = datetime('now', '+2 hours') WHERE id = ?`, [id]),
+  closeActiveSession: (userId) => run(`UPDATE sessions SET status = 'closed', left_at = datetime('now', '+2 hours') WHERE user_id = ? AND status = 'active'`, [userId]),
 
   getUserSessions: (userId, from, to) => {
     let sql = `SELECT s.*, o.name as object_name,
@@ -134,8 +134,8 @@ const db = {
 
   getTravel: (id) => queryOne(`SELECT t.*, o.name as from_object_name FROM travel_records t LEFT JOIN objects o ON t.from_object_id = o.id WHERE t.id = ?`, [id]),
   getActiveTravel: (userId) => queryOne(`SELECT t.*, o.name as from_object_name FROM travel_records t LEFT JOIN objects o ON t.from_object_id = o.id WHERE t.user_id = ? AND t.status = 'active' ORDER BY t.started_at DESC LIMIT 1`, [userId]),
-  createTravel: (userId, fromObjectId) => run(`INSERT INTO travel_records (user_id, from_object_id, started_at, status) VALUES (?, ?, datetime('now', 'localtime'), 'active')`, [userId, fromObjectId]),
-  closeTravel: (id) => run(`UPDATE travel_records SET status = 'closed', ended_at = datetime('now', 'localtime') WHERE id = ?`, [id]),
+  createTravel: (userId, fromObjectId) => run(`INSERT INTO travel_records (user_id, from_object_id, started_at, status) VALUES (?, ?, datetime('now', '+2 hours'), 'active')`, [userId, fromObjectId]),
+  closeTravel: (id) => run(`UPDATE travel_records SET status = 'closed', ended_at = datetime('now', '+2 hours') WHERE id = ?`, [id]),
 
   getUserTravels: (userId, from, to) => {
     let sql = `SELECT t.*, o.name as from_object_name,
@@ -166,10 +166,10 @@ const db = {
     const workRow = queryOne(workSql, wParams);
     const travelRow = queryOne(travelSql, tParams);
 
-    return {
-      work_minutes: workRow?.work_minutes || 0,
-      travel_minutes: travelRow?.travel_minutes || 0,
-    };
+    const raw = workRow?.work_minutes || 0;
+    const days = queryOne(`SELECT COUNT(DISTINCT date(arrived_at)) as d FROM sessions WHERE user_id=? AND status="closed"`, [userId]);
+    const work_minutes = Math.max(0, raw - ((days?.d||0)*30));
+    return { work_minutes, travel_minutes: travelRow?.travel_minutes || 0 };
   },
 
   getAllEmployees: () => queryAll(`
